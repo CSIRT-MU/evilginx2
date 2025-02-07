@@ -93,10 +93,16 @@ type ProxySession struct {
 }
 
 // set the value of the specified key in the JSON body
-func SetJSONVariable(body []byte, key string, value interface{}) ([]byte, error) {
+func SetJSONVariable(body []byte, key string, value interface{}, tp string) ([]byte, error) {
 	var data map[string]interface{}
 	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, err
+	}
+	switch tp {
+		case "boolean":
+			value,_ = strconv.ParseBool(value.(string))
+		default:
+			// nothing to do since the default is already 'string'
 	}
 	data[key] = value
 	newBody, err := json.Marshal(data)
@@ -737,7 +743,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 									}
 									if ok_search {
 										for _, fp_f := range fp.force {
-											body, err = SetJSONVariable(body, fp_f.key, fp_f.value)
+											body, err = SetJSONVariable(body, fp_f.key, fp_f.value, fp_f.tp)
 											if err != nil {
 												log.Debug("force_post: got error: %s", err)
 											}

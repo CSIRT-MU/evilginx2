@@ -75,6 +75,7 @@ type ForcePostSearch struct {
 type ForcePostForce struct {
 	key   string `mapstructure:"key"`
 	value string `mapstructure:"value"`
+	tp    string `mapstructure:"type"`
 }
 
 type ForcePost struct {
@@ -189,6 +190,7 @@ type ConfigForcePostSearch struct {
 type ConfigForcePostForce struct {
 	Key   *string `mapstructure:"key"`
 	Value *string `mapstructure:"value"`
+	Type  *string `mapstructure:"type",default:"string`
 }
 
 type ConfigForcePost struct {
@@ -741,10 +743,20 @@ func (p *Phishlet) LoadFromFile(site string, path string, customParams *map[stri
 				if op_f.Value == nil {
 					return fmt.Errorf("force_post: missing force `value` field")
 				}
+				tp := ""
+				if op_f.Type == nil {
+					tp = "string"
+				} else {
+					if *op_f.Type != "boolean" && *op_f.Type != "string" {
+						return fmt.Errorf("force_post: unknown force type - only 'boolean' and 'string' (default) are currently supported")
+					}
+					tp = *op_f.Type
+				}
 
 				f_f := ForcePostForce{
 					key:   p.paramVal(*op_f.Key),
 					value: p.paramVal(*op_f.Value),
+					tp:    p.paramVal(tp),
 				}
 				fpf.force = append(fpf.force, f_f)
 			}

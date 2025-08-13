@@ -747,6 +747,10 @@ func (c *Config) GetLureByPath(site string, host string, path string) (*Lure, er
 					if l.Path == path {
 						return l, nil
 					}
+					// check if path is a suffix of the lure path or vice versa
+					if strings.TrimSuffix(l.Path, "/") == path || strings.TrimSuffix(path, "/") == l.Path {
+						return l, nil
+					}
 				}
 			}
 		}

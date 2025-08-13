@@ -1,4 +1,6 @@
 # Unreleased
+- Feature: Redacting of passwords
+- Fixed: Various bug fixes in http_proxy.go
 - Fixed: Improved logging
 - Fixed: Redirection to `redirect_url` on page reload after authorization tokens have been captured.
 

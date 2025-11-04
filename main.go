@@ -47,8 +47,6 @@ func main() {
 	exe_dir := filepath.Dir(exe_path)
 
 	core.Banner()
-	showEvilginxProAd()
-	showEvilginxMasteryAd()
 
 	// CUSTOM STDLIB LOGGER
 	log.InitFileLogger("evilginx2.log", "[evilginx2] ", _log.LstdFlags|_log.Lshortfile)

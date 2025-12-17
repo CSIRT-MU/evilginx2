@@ -21,6 +21,7 @@ var debug_log = flag.Bool("debug", false, "Enable debug output")
 var developer_mode = flag.Bool("developer", false, "Enable developer mode (generates self-signed certificates for all hostnames)")
 var cfg_dir = flag.String("c", "", "Configuration directory path")
 var version_flag = flag.Bool("v", false, "Show version")
+var show_requests = flag.Bool("show-requests", false, "Log all http requests and responses")
 
 func joinPath(base_path string, rel_path string) string {
 	var ret string
@@ -118,6 +119,7 @@ func main() {
 		return
 	}
 	cfg.SetRedirectorsDir(*redirectors_dir)
+	cfg.SetShowRequests(*show_requests)
 
 	db, err := database.NewDatabase(filepath.Join(*cfg_dir, "data.db"))
 	if err != nil {

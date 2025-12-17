@@ -1,22 +1,22 @@
 module github.com/kgretzky/evilginx2
 
-go 1.25.3
+go 1.25.5
 
 require (
 	github.com/caddyserver/certmagic v0.25.0
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/elazarl/goproxy v0.0.0-20220529153421-8ea89ba92021
 	github.com/fatih/color v1.18.0
-	github.com/go-acme/lego/v3 v3.9.0
-	github.com/go-resty/resty/v2 v2.16.5
+	github.com/go-acme/lego/v4 v4.29.0
+	github.com/go-resty/resty/v2 v2.17.0
 	github.com/gorilla/mux v1.8.1
 	github.com/inconshreveable/go-vhost v0.0.0-20160627193104-06d84117953b
-	github.com/miekg/dns v1.1.68
+	github.com/miekg/dns v1.1.69
 	github.com/mwitkow/go-http-dialer v0.0.0-20161116154839-378f744fb2b8
 	github.com/spf13/viper v1.21.0
 	github.com/tidwall/buntdb v1.3.2
-	go.uber.org/zap v1.27.0
-	golang.org/x/net v0.46.0
+	go.uber.org/zap v1.27.1
+	golang.org/x/net v0.48.0
 )
 
 require (
@@ -24,6 +24,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
+	github.com/go-acme/lego/v3 v3.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
@@ -50,13 +51,13 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap/exp v0.3.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.43.0 // indirect
-	golang.org/x/mod v0.28.0 // indirect
-	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.37.0 // indirect
-	golang.org/x/text v0.30.0 // indirect
+	golang.org/x/crypto v0.46.0 // indirect
+	golang.org/x/mod v0.30.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/text v0.32.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
-	golang.org/x/tools v0.37.0 // indirect
+	golang.org/x/tools v0.39.0 // indirect
 	gopkg.in/square/go-jose.v2 v2.3.1 // indirect
 )
 

